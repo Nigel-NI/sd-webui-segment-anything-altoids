@@ -123,7 +123,12 @@ Automatic Segmentation has been supported in this extension. It has the followin
 
 ### Forge Neo / ControlNet Integrated
 
-This fork can copy SAM images and masks into Forge Neo's built-in `ControlNet Integrated` units. Configure and enable the target ControlNet unit in Forge Neo as usual, then use this extension's copy checkboxes to provide the input image or image/mask pair. When SAM copies data into a Forge Neo unit, the unit preprocessor is set to `None` so Forge uses the SAM output directly instead of running a second preprocessor.
+This fork supports Forge Neo's built-in `ControlNet Integrated` in addition to the standalone ControlNet extension.
+
+1. SAM can copy image and mask data into the selected Forge Neo ControlNet unit.
+2. Forge Neo's `control_net_unit_count` setting is used for Multi-ControlNet unit count when available. The older `control_net_max_models_num` setting remains supported for standalone ControlNet.
+3. When SAM copies data into a Forge Neo unit, the unit preprocessor is set to `None` so Forge uses the SAM output directly instead of running a second preprocessor. This avoids stale preprocessors such as `lineart_anime_denoise` being applied to a SAM-generated control image.
+4. Gradio 4 gallery outputs are supported when selecting SAM masks, expanded masks and AutoSAM outputs.
 
 Forge Neo's built-in ControlNet does not include the old `sd-webui-controlnet/annotator` semantic segmentation package. Random AutoSAM output and ControlNet input copying work with Forge Neo alone, but `seg_ufade20k`, `seg_ofade20k`, `seg_ofcoco`, and category masks still need the old ControlNet annotators if you want those semantic preprocessing features.
 
@@ -145,18 +150,18 @@ If you have previously enabled other copies while using this extension, you may 
 5. Click `Preview Segmentation` button. Due to the limitation of SAM, if there are multiple bounding boxes, your point prompts will not take effect when generating masks.
 6. Choose your favorite segmentation.
 7. Optionally check `Expand Mask` and specify the amount, then click `Update Mask`.
-8. [**VERY IMPORTANT**] Update your ControlNet and check `Allow other script to control this extension` (**MUST**) on your ControlNet settings.
+8. [**VERY IMPORTANT**] If you use the standalone ControlNet extension, update your ControlNet and check `Allow other script to control this extension` (**MUST**) on your ControlNet settings. Forge Neo ControlNet Integrated does not require this setting.
 
 #### txt2img
 1. You may only copy image and mask to ControlNet inpainting. 
 2. Optionally check `ControlNet inpaint not masked` to invert mask colors and inpaint regions outside of the mask.
 3. Select the correct ControlNet index where you are using inpainting, if you wish to use Multi-ControlNet. 
-4. Configurate ControlNet panel. Click `Enable`, preprocessor choose `inpaint_global_harmonious`, model choose `control_v11p_sd15_inpaint [ebff9138]`. There is no need to upload image to the ControlNet inpainting panel.
+4. Configurate ControlNet panel. Click `Enable`, preprocessor choose `inpaint_global_harmonious`, model choose `control_v11p_sd15_inpaint [ebff9138]`. There is no need to upload image to the ControlNet inpainting panel. In Forge Neo, SAM will switch the selected ControlNet unit preprocessor to `None` when copying the image and mask.
 5. Write your prompts, configurate A1111 panel and click `Generate`.
 
 #### img2img
 1. Check `Copy to Inpaint Upload & ControlNet Inpainting`. There is no need to select ControlNet index.
-2. Configurate ControlNet panel. Click `Enable`, preprocessor choose `inpaint_global_harmonious`, model choose `control_v11p_sd15_inpaint [ebff9138]`. There is no need to upload image to the ControlNet inpainting panel.
+2. Configurate ControlNet panel. Click `Enable`, preprocessor choose `inpaint_global_harmonious`, model choose `control_v11p_sd15_inpaint [ebff9138]`. There is no need to upload image to the ControlNet inpainting panel. In Forge Neo, SAM will switch the selected ControlNet unit preprocessor to `None` when copying the image and mask.
 3. Click `Switch to Inpaint Upload` button. There is no need to upload another image or mask, just leave them blank. Write your prompts, configurate A1111 panel and click `Generate`.
 
 ### Batch Process
@@ -167,7 +172,7 @@ If you have previously enabled other copies while using this extension, you may 
 
 ### AutoSAM
 
-1. Install and update [Mikubill ControlNet Extension](https://github.com/Mikubill/sd-webui-controlnet) before using it.
+1. Install and update [Mikubill ControlNet Extension](https://github.com/Mikubill/sd-webui-controlnet) before using semantic annotators. Forge Neo ControlNet Integrated can receive copied SAM images and masks without the standalone ControlNet extension.
 2. Configurate AutoSAM tunnable parameters according to descriptions [here](https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/automatic_mask_generator.py#L35-L96). Use default if you cannot understand.
 
 #### ControlNet
@@ -177,7 +182,7 @@ If you have previously enabled other copies while using this extension, you may 
     - `random` is for [EditAnything](https://github.com/sail-sg/EditAnything). There is no need to set preprocessor resolution for random preprocessor since it does not contain semantic segmentation, but you need to pick an image from the AutoSeg output gallery to copy to ControlNet. 1 represents random colorization of different mask regions which is reserved for future ControlNet, 2 represents fixed colorization which can be EditAnything ControlNet control image.
 2. Click preview segmentation image. For semantic semgentations, you will see 4 images where the left 2 are without SAM and the right 2 are with SAM. For random preprocessor, you will see 3 images where the top-left is the blended image, the top-right is random colorized masks and the down-left is for EditAnything ControlNet.
 3. Check `Copy to ControlNet Segmentation` and select the correct ControlNet index where you are using ControlNet segmentation models if you wish to use Multi-ControlNet.
-4. Configurate ControlNet panel. Click `Enable`, preprocessor choose `none`, model choose `control_v11p_sd15_seg [e1f51eb9]`. There is no need to upload image to the ControlNet segmentation panel.
+4. Configurate ControlNet panel. Click `Enable`, preprocessor choose `none`, model choose `control_v11p_sd15_seg [e1f51eb9]`. There is no need to upload image to the ControlNet segmentation panel. In Forge Neo, SAM will also set the selected ControlNet unit preprocessor to `None` when copying the AutoSAM output.
 5. Write your prompts, configurate A1111 panel and click `Generate`.
 6. If you want to use [EditAnything](https://github.com/sail-sg/EditAnything), you need to modify some steps above:
     - In step 1: you need to choose `random` preprocessor.
