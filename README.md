@@ -121,8 +121,14 @@ Automatic Segmentation has been supported in this extension. It has the followin
 3. You can generate image layout and edit them inside PhotoShop. Both single image and batch process are supported.
 4. You can generate masks according to category IDs. This tend to be more accurate compared to purely SAM+GroundingDINO segmentation, if what you want is a large object.
 
+### Forge Neo / ControlNet Integrated
+
+This fork can copy SAM images and masks into Forge Neo's built-in `ControlNet Integrated` units. Configure and enable the target ControlNet unit in Forge Neo as usual, then use this extension's copy checkboxes to provide the input image or image/mask pair. When SAM copies data into a Forge Neo unit, the unit preprocessor is set to `None` so Forge uses the SAM output directly instead of running a second preprocessor.
+
+Forge Neo's built-in ControlNet does not include the old `sd-webui-controlnet/annotator` semantic segmentation package. Random AutoSAM output and ControlNet input copying work with Forge Neo alone, but `seg_ufade20k`, `seg_ofade20k`, `seg_ofcoco`, and category masks still need the old ControlNet annotators if you want those semantic preprocessing features.
+
 However, there are some existing problems with AutoSAM:
-1. You are required to install [Mikubill ControlNet Extension](https://github.com/Mikubill/sd-webui-controlnet) to use functionality 1 and 4. Please do not change the directory name (`sd-webui-controlnet`).
+1. You are required to install [Mikubill ControlNet Extension](https://github.com/Mikubill/sd-webui-controlnet) to use semantic annotator functionality 1 and 4. Please do not change the directory name (`sd-webui-controlnet`). Forge Neo ControlNet Integrated can still receive copied images and masks without that old extension.
 2. You are required to open WebUI via administrative mode the first time you access this feature if you are using Windows. This is because Windows does not allow visitors to create symbolic links via python.
 3. You can observe drastic improvement if you combine `seg_ufade20k` and SAM. You may only observe some slight improvement if you combine one of the `Oneformer` preprocessors (`seg_ofade20k`&`seg_ofcoco`). This is because [Oneformer](https://github.com/SHI-Labs/OneFormer) is already very strong, compared to Uniformer, for semantic segmentation. SAM can only improve some details of semantic segmentation instead of showing some categories semantic models cannot show, because SAM is NOT a semantic-recognizable model.
 4. Image layout generation has a pretty bad performance for anime images. I discourage you from using this functionality if you are dealing with anime images. I'm not sure about the performance for real images.

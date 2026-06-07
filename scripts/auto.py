@@ -2,6 +2,8 @@ import os
 import gc
 import glob
 import copy
+import importlib.util
+import sys
 from PIL import Image
 from collections import OrderedDict
 import numpy as np
@@ -10,6 +12,10 @@ import cv2
 from sam_hq.automatic import SamAutomaticMaskGeneratorHQ
 from modules import scripts, shared
 from modules.paths import extensions_dir
+try:
+    from modules.paths import extensions_builtin_dir
+except Exception:
+    extensions_builtin_dir = None
 from modules.devices import torch_gc
 
 
@@ -17,6 +23,43 @@ global_sam: SamAutomaticMaskGeneratorHQ = None
 sem_seg_cache = OrderedDict()
 sam_annotator_dir = os.path.join(scripts.basedir(), "annotator")
 original_uniformer_inference_segmentor = None
+
+
+def _annotator_candidates():
+    candidates = [
+        os.path.join(extensions_dir, "sd-webui-controlnet", "annotator"),
+        os.path.join(extensions_dir, "sd_forge_controlnet", "annotator"),
+    ]
+    if extensions_builtin_dir is not None:
+        candidates.append(os.path.join(extensions_builtin_dir, "sd_forge_controlnet", "annotator"))
+    return candidates
+
+
+def _find_controlnet_annotator_dir():
+    for candidate in _annotator_candidates():
+        if os.path.isdir(candidate):
+            return candidate
+    return None
+
+
+def _ensure_annotator_import_path(annotator_dir):
+    parent = os.path.dirname(annotator_dir)
+    if parent not in sys.path:
+        sys.path.insert(0, parent)
+
+
+def has_controlnet_annotator():
+    if os.path.isdir(sam_annotator_dir):
+        return True
+    if importlib.util.find_spec("annotator") is not None:
+        return True
+    return _find_controlnet_annotator_dir() is not None
+
+
+def controlnet_annotator_missing_message():
+    return ("ControlNet annotators not found. Forge Neo ControlNet Integrated can receive copied SAM images, "
+            "but semantic preprocessors like seg_ufade20k/seg_ofade20k still require the old sd-webui-controlnet "
+            "annotator package.")
 
 
 def pad64(x):
@@ -52,10 +95,15 @@ def blend_image_and_seg(image, seg, alpha=0.5):
 
 
 def create_symbolic_link():
-    cnet_annotator_dir = os.path.join(extensions_dir, "sd-webui-controlnet/annotator")
-    if os.path.isdir(cnet_annotator_dir):
+    if os.path.isdir(sam_annotator_dir) or importlib.util.find_spec("annotator") is not None:
+        return True
+    cnet_annotator_dir = _find_controlnet_annotator_dir()
+    if cnet_annotator_dir is not None and os.path.isdir(cnet_annotator_dir):
         if not os.path.isdir(sam_annotator_dir):
-            os.symlink(cnet_annotator_dir, sam_annotator_dir, target_is_directory=True)
+            try:
+                os.symlink(cnet_annotator_dir, sam_annotator_dir, target_is_directory=True)
+            except OSError:
+                _ensure_annotator_import_path(cnet_annotator_dir)
         return True
     return False
 
@@ -218,7 +266,7 @@ def semantic_segmentation(input_image, annotator_name, processor_res,
         return [], "No input image."
     if "seg" in annotator_name:
         if not os.path.isdir(os.path.join(scripts.basedir(), "annotator")) and not create_symbolic_link():
-            return [], "ControlNet extension not found."
+            return [], controlnet_annotator_missing_message()
         global original_uniformer_inference_segmentor
         input_image_np = np.array(input_image)
         processor_res = pixel_perfect_lllyasviel(input_image_np, processor_res, use_pixel_perfect, resize_mode, target_W, target_H)
@@ -260,7 +308,7 @@ def categorical_mask_image(crop_processor, crop_processor_res, crop_category_inp
     if crop_input_image is None:
         return "No input image."
     if not os.path.isdir(os.path.join(scripts.basedir(), "annotator")) and not create_symbolic_link():
-        return "ControlNet extension not found."
+        return controlnet_annotator_missing_message()
     filter_classes = crop_category_input.split('+')
     if len(filter_classes) == 0:
         return "No class selected."

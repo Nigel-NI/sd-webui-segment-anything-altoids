@@ -19,7 +19,7 @@ from modules.paths import models_path
 from sam_hq.predictor import SamPredictorHQ
 from sam_hq.build_sam_hq import sam_model_registry
 from scripts.dino import dino_model_list, dino_predict_internal, show_boxes, clear_dino_cache, dino_install_issue_text
-from scripts.auto import clear_sem_sam_cache, register_auto_sam, semantic_segmentation, sem_sam_garbage_collect, image_layer_internal, categorical_mask_image
+from scripts.auto import clear_sem_sam_cache, register_auto_sam, semantic_segmentation, sem_sam_garbage_collect, image_layer_internal, categorical_mask_image, has_controlnet_annotator
 from scripts.process_params import SAMProcessUnit, max_cn_num
 
 import importlib.metadata
@@ -444,6 +444,7 @@ def priorize_sam_scripts(is_img2img):
         if cnet_idx is not None and sam_idx is not None and cnet_idx < sam_idx:
             scripts.scripts_img2img.alwayson_scripts[cnet_idx], scripts.scripts_img2img.alwayson_scripts[
                 sam_idx] = scripts.scripts_img2img.alwayson_scripts[sam_idx], scripts.scripts_img2img.alwayson_scripts[cnet_idx]
+            scripts.scripts_img2img.callback_map.clear()
     else:
         for idx, s in enumerate(scripts.scripts_txt2img.alwayson_scripts):
             if s.title() == "Segment Anything":
@@ -453,6 +454,7 @@ def priorize_sam_scripts(is_img2img):
         if cnet_idx is not None and sam_idx is not None and cnet_idx < sam_idx:
             scripts.scripts_txt2img.alwayson_scripts[cnet_idx], scripts.scripts_txt2img.alwayson_scripts[
                 sam_idx] = scripts.scripts_txt2img.alwayson_scripts[sam_idx], scripts.scripts_txt2img.alwayson_scripts[cnet_idx]
+            scripts.scripts_txt2img.callback_map.clear()
 
 
 def ui_sketch_inner():
@@ -524,22 +526,28 @@ def ui_batch(is_dino):
 
 
 def ui_processor(use_random=True, use_cnet=True):
-    processor_choices = ["seg_ufade20k", "seg_ofade20k", "seg_ofcoco"]
+    semantic_choices = ["seg_ufade20k", "seg_ofade20k", "seg_ofcoco"]
+    processor_choices = semantic_choices.copy()
     if use_random:
         processor_choices.append("random")
+    if use_random and not has_controlnet_annotator():
+        processor_choices = ["random"]
+    default_processor = processor_choices[0]
+    is_random_default = default_processor == "random"
     with gr.Row():
-        cnet_seg_processor = gr.Radio(choices=processor_choices, value="seg_ufade20k", label="Choose preprocessor for semantic segmentation: ")
-        cnet_seg_processor_res = gr.Slider(label="Preprocessor resolution", value=512, minimum=64, maximum=2048, step=1)
+        cnet_seg_processor = gr.Radio(choices=processor_choices, value=default_processor, label="Choose preprocessor for semantic segmentation: ")
+        cnet_seg_processor_res = gr.Slider(label="Preprocessor resolution", value=512, minimum=64, maximum=2048, step=1, visible=not is_random_default)
         cnet_seg_resize_mode = gr.Radio(choices=["Just Resize", "Crop and Resize", "Resize and Fill"], value="Crop and Resize", label="Resize Mode", type="index", visible=False)
         if use_random and use_cnet:
             cnet_seg_gallery_input = gr.Radio(
-                choices=["1", "2"], value="2", type="index", visible=False, 
+                choices=["1", "2"], value="2", type="index", visible=is_random_default,
                 label="Select ControlNet input from random segmentation gallery. Choose 2 for Edit-Anything ControlNet.")
         else:
             cnet_seg_gallery_input = gr.Label(visible=False)
     with gr.Row():
         cnet_seg_pixel_perfect = gr.Checkbox(value=False, label="Enable Pixel Perfect from lllyasviel. "
-                                             "Configure your target width and height on txt2img/img2img default panel before preview if you wish to enable pixel perfect.")
+                                             "Configure your target width and height on txt2img/img2img default panel before preview if you wish to enable pixel perfect.",
+                                             visible=not is_random_default)
         if use_random and use_cnet:
             cnet_seg_processor.change(
                 fn=lambda x, y: (gr_show(x=="random"), gr_show(x!="random"), gr_show(x!="random" and not y), gr_show(x!="random" and y)),
@@ -656,8 +664,8 @@ class Script(scripts.Script):
                         outputs=[dino_batch_progress])
                     
                 with gr.TabItem(label="Auto SAM"):
-                    gr.Markdown("Auto SAM is mainly for semantic segmentation and image layout generation, which is supported based on ControlNet. You must have ControlNet extension installed, and you should not change its directory name (sd-webui-controlnet).")
-                    gr.Markdown("The annotator directory inside the SAM extension directory is only a symbolic link. This is to save your space and make the extension repository clean.")
+                    gr.Markdown("Auto SAM can copy generated control images to ControlNet, including Forge Neo ControlNet Integrated. Semantic annotators such as Uniformer/OneFormer still require the old sd-webui-controlnet annotator package.")
+                    gr.Markdown("When the old annotator package is available, the annotator directory inside the SAM extension directory is only a symbolic link. This is to save your space and make the extension repository clean.")
 
                     with gr.Accordion(label="Auto SAM Config", open=False):
                         gr.Markdown("You may configurate automatic sam generation. See [here](https://github.com/facebookresearch/segment-anything/blob/main/segment_anything/automatic_mask_generator.py#L35-L96) for explanation of each parameter. If you still cannot understand, use default.")
@@ -682,7 +690,7 @@ class Script(scripts.Script):
                     with gr.Tabs():
                         with gr.TabItem(label="ControlNet"):
                             gr.Markdown(
-                                "You can enhance semantic segmentation for control_v11p_sd15_seg from lllyasviel. "
+                                "You can enhance semantic segmentation for control_v11p_sd15_seg from lllyasviel when old ControlNet annotators are available. "
                                 "You can also utilize [Edit-Anything](https://github.com/sail-sg/EditAnything) and generate images according to random segmentation which preserve image layout.")
                             cnet_seg_processor, cnet_seg_processor_res, cnet_seg_gallery_input, cnet_seg_pixel_perfect, cnet_seg_resize_mode = ui_processor(use_cnet=(max_cn_num() > 0))
                             cnet_seg_input_image = gr.Image(label="Image for Auto Segmentation", source="upload", type="pil", image_mode="RGBA")
@@ -765,8 +773,8 @@ class Script(scripts.Script):
                             
                             
                 with gr.TabItem(label="Upload Mask to ControlNet Inpainting"):
-                    gr.Markdown("This panel is for those who want to upload mask to ControlNet inpainting. It is not part of the SAM feature. It might be removed someday when ControlNet support uploading image and mask. "
-                                "It serves as a temporarily workaround to overcome the unavailability of image with mask uploading feature in ControlNet extension.")
+                    gr.Markdown("This panel is for those who want to upload mask to ControlNet inpainting. It is not part of the SAM feature. "
+                                "It serves as a temporary workaround and also copies image/mask data into Forge Neo ControlNet Integrated when available.")
                     with gr.Row():
                         cnet_upload_enable = gr.Checkbox(value=False, label="Enable uploading manually created mask to SAM.")
                         cnet_upload_num = gr.Radio(value="0", choices=[str(i) for i in range(max_cn_num())], label='ControlNet Inpaint Number', type="index")
