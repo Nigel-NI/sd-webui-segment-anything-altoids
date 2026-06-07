@@ -154,6 +154,10 @@ class SAMInpaintUnit:
 class SAMProcessUnit:
     def __init__(self, args: Tuple, is_img2img=False):
         self.is_img2img = is_img2img
+        self.enabled = True
+        if len(args) >= 25:
+            self.enabled = bool(args[0])
+            args = args[1:]
         self.sam_inpaint_unit = SAMInpaintUnit(args, is_img2img)
 
         args = args[8:]
@@ -189,6 +193,9 @@ class SAMProcessUnit:
 
     
     def set_process_attributes(self, p):
+        if not self.enabled:
+            return
+
         inpaint_mask_blur = getattr(p, "mask_blur", 0)
         inpaint_image, inpaint_mask = self.sam_inpaint_unit.get_input_and_mask(inpaint_mask_blur)
         inpaint_cn_num = self.sam_inpaint_unit.cnet_inpaint_idx

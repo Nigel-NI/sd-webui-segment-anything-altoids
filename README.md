@@ -142,6 +142,8 @@ However, there are some existing problems with AutoSAM:
 
 If you have previously enabled other copies while using this extension, you may want to click `Uncheck all copies` at the bottom of this extension UI, to prevent other copies from affecting your current page.
 
+Check `Enable Segment Anything during generation` before clicking `Generate` when you want SAM to copy masks or control images into img2img or ControlNet. Leave it unchecked for ordinary generation.
+
 ### Single Image
 1. Upload your image
 2. Optionally add point prompts on the image. Left click for positive point prompt (black dot), right click for negative point prompt (red dot), left click any dot again to cancel the prompt. You must add point prompt if you do not wish to use GroundingDINO.

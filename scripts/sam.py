@@ -579,6 +579,8 @@ class Script(scripts.Script):
         tab_prefix = ("img2img" if is_img2img else "txt2img") + "_sam_"
         ui_process = ()
         with gr.Accordion('Segment Anything', open=False):
+            sam_enabled = gr.Checkbox(value=False, label="Enable Segment Anything during generation", elem_id=f"{tab_prefix}enable_checkbox")
+            ui_process += (sam_enabled,)
             with gr.Row():
                 with gr.Column(scale=10):
                     with gr.Row():
